@@ -46,7 +46,10 @@ int Connect4Solver::negamax(const Position &currentPosition, int depth, int alph
         return 0; // Time's up, return a neutral score
     }
 
-    for (int x = 0; x < Position::WIDTH; x++) {
+    int columnOrder[Position::WIDTH] = {3, 2, 4, 1, 5, 0, 6};  // Static column order strategy (center columns first)
+
+    for (int i = 0; i < Position::WIDTH; i++) {
+        int x = columnOrder[i];
         if (currentPosition.canPlay(x)) {
             Position nextPosition(currentPosition);
             nextPosition.playColumn(x);
