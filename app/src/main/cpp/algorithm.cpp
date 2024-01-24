@@ -52,7 +52,7 @@ int Connect4Solver::negamax(const Position &currentPosition, int depth, int alph
         int x = columnOrder[i];
         if (currentPosition.canPlay(x)) {
             Position nextPosition(currentPosition);
-            nextPosition.playColumn(x);
+            nextPosition.play(x);  // Corrected method name
 
             int score = -negamax(nextPosition, depth - 1, -beta, -alpha, startTime);
 
@@ -84,7 +84,7 @@ int main() {
 
     for (int lineNumber = 1; std::getline(std::cin, line); lineNumber++) {
         Position currentPosition;
-        if (currentPosition.playSequence(line) != line.size()) {
+        if (currentPosition.play(line) != line.size()) {  // Corrected method name
             std::cerr << "Line " << lineNumber << ": Invalid move " << (currentPosition.nbMoves() + 1) << " \"" << line << "\"" << "\n";
             continue;
         }

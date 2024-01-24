@@ -1,145 +1,196 @@
-#ifndef BOARD_HPP
-#define BOARD_HPP
+#ifndef POSITION_HPP
+#define POSITION_HPP
 
-#include <iostream>
 #include <string>
-#include <algorithm>
+#include <cstdint>
 
-namespace GameSolver {
-    namespace Connect4 {
+namespace GameSolver { namespace Connect4 {
 
-/**
- * A class representing a Connect 4 game position.
- * All functions are relative to the current player to play.
- *
- * This class does not support positions with alignments, as there is no need to solve an already won position.
- */
+        enum Player {
+            PLAYER_X = 1,
+            PLAYER_O = 0
+        };
+
+        /**
+         * A class storing a Connect 4 position.
+         * Functions are relative to the current player to play.
+         * Positions containing alignments are not supported by this class.
+         *
+         * A binary bitboard representation is used.
+         * Each column is encoded on HEIGHT+1 bits.
+         *
+         * Example of bit order to encode for a 7x6 board
+         * .  .  .  .  .  .  .
+         * 5 12 19 26 33 40 47
+         * 4 11 18 25 32 39 46
+         * 3 10 17 24 31 38 45
+         * 2  9 16 23 30 37 44
+         * 1  8 15 22 29 36 43
+         * 0  7 14 21 28 35 42
+         *
+         * Position is stored as
+         * - a bitboard "mask" with 1 on any color stones
+         * - a bitboard "current_player" with 1 on stones of the current player
+         *
+         * "current_player" bitboard can be transformed into a compact and non-ambiguous key
+         * by adding an extra bit on top of the last non-empty cell of each column.
+         * This allows identifying all the empty cells without needing "mask" bitboard.
+         *
+         * current_player "x" = 1, opponent "o" = 0
+         * board     position  mask      key       bottom
+         *           0000000   0000000   0000000   0000000
+         * .......   0000000   0000000   0001000   0000000
+         * ...o...   0000000   0001000   0010000   0000000
+         * ..xx...   0011000   0011000   0011000   0000000
+         * ..ox...   0001000   0011000   0001100   0000000
+         * ..oox..   0000100   0011100   0000110   0000000
+         * ..oxxo.   0001100   0011110   1101101   1111111
+         *
+         * current_player "o" = 1, opponent "x" = 0
+         * board     position  mask      key       bottom
+         *           0000000   0000000   0001000   0000000
+         * ...x...   0000000   0001000   0000000   0000000
+         * ...o...   0001000   0001000   0011000   0000000
+         * ..xx...   0000000   0011000   0000000   0000000
+         * ..ox...   0010000   0011000   0010100   0000000
+         * ..oox..   0011000   0011100   0011010   0000000
+         * ..oxxo.   0010010   0011110   1110011   1111111
+         *
+         * key is a unique representation of a board key = position + mask + bottom
+         * in practice, as the bottom is constant, key = position + mask is also a
+         * non-ambiguous representation of the position.
+         */
         class Position {
         public:
-            static constexpr int WIDTH = 7;   // Width of the board
-            static constexpr int HEIGHT = 6;  // Height of the board
+            static const int WIDTH = 7;  // width of the board
+            static const int HEIGHT = 6; // height of the board
             static_assert(WIDTH < 10, "Board's width must be less than 10");
-
-            Position() : board{}, columnHeight{}, moves{0} {}
+            static_assert(WIDTH * (HEIGHT + 1) <= 64, "Board does not fit in 64bits bitboard");
 
             /**
-             * Checks if a column is playable.
+             * Indicates whether a column is playable.
              * @param col: 0-based index of the column to play
              * @return true if the column is playable, false if the column is already full.
              */
             bool canPlay(int col) const
             {
-                return columnHeight[col] < HEIGHT;
+                return (mask & topMask(col)) == 0;
             }
 
             /**
              * Plays a playable column.
-             * This function should not be called on a non-playable column or a column that makes an alignment.
+             * This function should not be called on a non-playable column or a column making an alignment.
              *
              * @param col: 0-based index of a playable column.
              */
-            void playColumn(int col)
+            void play(int col)
             {
-                int currentPlayer = 1 + moves % 2;
-                board[col][columnHeight[col]++] = currentPlayer;
+                currentPosition ^= mask;
+                mask |= mask + bottomMask(col);
                 moves++;
             }
 
-            /*
+            /**
              * Plays a sequence of successive played columns, mainly used to initialize a board.
              * @param seq: a sequence of digits corresponding to the 1-based index of the column played.
              *
-             * @return number of played moves. Processing will stop at the first invalid move, which can be:
-             *           - an invalid character (non-digit or digit >= WIDTH)
+             * @return number of played moves. Processing will stop at the first invalid move that can be:
+             *           - invalid character (non-digit, or digit >= WIDTH)
              *           - playing a column that is already full
-             *           - playing a column that makes an alignment (we only solve non-alignments).
+             *           - playing a column that makes an alignment (we only solve non).
              *         The caller can check if the move sequence was valid by comparing the number of
              *         processed moves to the length of the sequence.
              */
-            unsigned int playSequence(const std::string& seq)
+            unsigned int play(std::string seq)
             {
-                for (char ch : seq) {
-                    int col = ch - '1';
-                    if (isValidMove(col))
-                        playColumn(col);
-                    else
-                        return seq.size();  // invalid move
+                for(unsigned int i = 0; i < seq.size(); i++) {
+                    int col = seq[i] - '1';
+                    if(col < 0 || col >= Position::WIDTH || !canPlay(col) || isWinningMove(col)) return i; // invalid move
+                    play(col);
                 }
                 return seq.size();
             }
 
             /**
-             * Checks if the current player wins by playing a given column.
+             * Indicates whether the current player wins by playing a given column.
              * This function should never be called on a non-playable column.
              * @param col: 0-based index of a playable column.
              * @return true if the current player makes an alignment by playing the corresponding column col.
              */
-            bool winningMove(int col) const
+            bool isWinningMove(int col) const
             {
-                int currentPlayer = 1 + moves % 2;
-                int h = columnHeight[col];
-
-                // Check for vertical, horizontal, and diagonal alignments
-                for (int dx = -1; dx <= 1; ++dx) {
-                    for (int dy = -1; dy <= 1; ++dy) {
-                        if (dx == 0 && dy == 0) continue;  // Skip the case where both dx and dy are zero
-
-                        int count = countStonesInDirection(col, h, dx, dy);
-                        if (count >= 3) return true;
-                    }
-                }
-
-                return false;
+                uint64_t pos = currentPosition;
+                pos |= (mask + bottomMask(col)) & columnMask(col);
+                return alignment(pos);
             }
 
             /**
-             * Returns the number of moves played from the beginning of the game.
+             * @return number of moves played from the beginning of the game.
              */
             unsigned int nbMoves() const
             {
                 return moves;
             }
 
-        private:
-            int board[WIDTH][HEIGHT]{};  // 0 if the cell is empty, 1 for the first player, and 2 for the second player.
-            int columnHeight[WIDTH]{};   // Number of stones per column
-            unsigned int moves{0};      // Number of moves played since the beginning of the game.
-
             /**
-             * Checks if a move to the given column is valid.
-             * @param col: 0-based index of the column to check
-             * @return true if the move is valid, false otherwise.
+             * @return a compact representation of a position on WIDTH * (HEIGHT+1) bits.
              */
-            bool isValidMove(int col) const
+            uint64_t key() const
             {
-                return col >= 0 && col < WIDTH && canPlay(col) && !winningMove(col);
+                return currentPosition + mask;
             }
 
             /**
-             * Counts the number of stones of the current player in a given direction from a specific position.
-             * @param startCol: The starting column
-             * @param startRow: The starting row
-             * @param dx: The change in column direction (-1, 0, or 1)
-             * @param dy: The change in row direction (-1, 0, or 1)
-             * @return The count of stones in the specified direction.
+             * Default constructor, build an empty position.
              */
-            int countStonesInDirection(int startCol, int startRow, int dx, int dy) const
-            {
-                int currentPlayer = board[startCol][startRow];
+            Position() : currentPosition{0}, mask{0}, moves{0} {}
 
-                for (int i = 1; i <= 3; ++i) {
-                    int col = startCol + i * dx;
-                    int row = startRow + i * dy;
+        private:
+            uint64_t currentPosition;
+            uint64_t mask;
+            unsigned int moves; // number of moves played since the beginning of the game.
 
-                    if (col < 0 || col >= WIDTH || row < 0 || row >= HEIGHT || board[col][row] != currentPlayer)
-                        return i - 1;  // Return the count directly without using a variable.
-                }
+            /**
+             * Test an alignment for the current player (identified by one in the bitboard pos).
+             * @param a bitboard position of a player's cells.
+             * @return true if the player has a 4-alignment.
+             */
+            static bool alignment(uint64_t pos) {
+                // horizontal
+                uint64_t m = pos & (pos >> (HEIGHT + 1));
+                if(m & (m >> (2 * (HEIGHT + 1)))) return true;
 
-                return 3;
+                // diagonal 1
+                m = pos & (pos >> HEIGHT);
+                if(m & (m >> (2 * HEIGHT))) return true;
+
+                // diagonal 2
+                m = pos & (pos >> (HEIGHT + 2));
+                if(m & (m >> (2 * (HEIGHT + 2)))) return true;
+
+                // vertical;
+                m = pos & (pos >> 1);
+                if(m & (m >> 2)) return true;
+
+                return false;
+            }
+
+            // return a bitmask containing a single 1 corresponding to the top cell of a given column
+            static uint64_t topMask(int col) {
+                return (UINT64_C(1) << (HEIGHT - 1)) << col * (HEIGHT + 1);
+            }
+
+            // return a bitmask containing a single 1 corresponding to the bottom cell of a given column
+            static uint64_t bottomMask(int col) {
+                return UINT64_C(1) << col * (HEIGHT + 1);
+            }
+
+            // return a bitmask 1 on all the cells of a given column
+            static uint64_t columnMask(int col) {
+                return ((UINT64_C(1) << HEIGHT) - 1) << col * (HEIGHT + 1);
             }
         };
 
-    }  // namespace Connect4
-}  // namespace GameSolver
+    }} // end namespaces
 
 #endif
