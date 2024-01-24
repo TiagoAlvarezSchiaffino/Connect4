@@ -3,19 +3,21 @@
 
 #include <iostream>
 #include <string>
+#include <algorithm>
 
-namespace GameSolver { namespace Connect4 {
+namespace GameSolver {
+    namespace Connect4 {
 
-        /**
-         * A class representing a Connect 4 game position.
-         * All functions are relative to the current player to play.
-         *
-         * This class does not support positions with alignments, as there is no need to solve an already won position.
-         */
+/**
+ * A class representing a Connect 4 game position.
+ * All functions are relative to the current player to play.
+ *
+ * This class does not support positions with alignments, as there is no need to solve an already won position.
+ */
         class Position {
         public:
-            static const int WIDTH = 7;  // Width of the board
-            static const int HEIGHT = 6; // Height of the board
+            static constexpr int WIDTH = 7;   // Width of the board
+            static constexpr int HEIGHT = 6;  // Height of the board
             static_assert(WIDTH < 10, "Board's width must be less than 10");
 
             Position() : board{}, columnHeight{}, moves{0} {}
@@ -58,9 +60,10 @@ namespace GameSolver { namespace Connect4 {
             {
                 for (char ch : seq) {
                     int col = ch - '1';
-                    if (col < 0 || col >= Position::WIDTH || !canPlay(col) || winningMove(col))
-                        return seq.size(); // invalid move
-                    playColumn(col);
+                    if (isValidMove(col))
+                        playColumn(col);
+                    else
+                        return seq.size();  // invalid move
                 }
                 return seq.size();
             }
@@ -76,20 +79,16 @@ namespace GameSolver { namespace Connect4 {
                 int currentPlayer = 1 + moves % 2;
                 int h = columnHeight[col];
 
-                // Check for vertical alignments
-                if (h >= 3 && board[col][h - 1] == currentPlayer && board[col][h - 2] == currentPlayer && board[col][h - 3] == currentPlayer)
-                    return true;
+                // Check for vertical, horizontal, and diagonal alignments
+                for (int dx = -1; dx <= 1; ++dx) {
+                    for (int dy = -1; dy <= 1; ++dy) {
+                        if (dx == 0 && dy == 0) continue;  // Skip the case where both dx and dy are zero
 
-                for (int dy = -1; dy <= 1; dy++) {    // Iterate on horizontal (dy = 0) or two diagonal directions (dy = -1 or dy = 1).
-                    int continuousStones = 0;         // Counter of the number of stones of the current player surrounding the played stone in the tested direction.
-                    for (int dx = -1; dx <= 1; dx += 2) // Count continuous stones of the current player on the left, then right of the played column.
-                        for (int x = col + dx, y = h + dx * dy; x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT && board[x][y] == currentPlayer; continuousStones++) {
-                            x += dx;
-                            y += dx * dy;
-                        }
-                    if (continuousStones >= 3) return true; // There is an alignment if at least 3 other stones of the current user
-                    // are surrounding the played stone in the tested direction.
+                        int count = countStonesInDirection(col, h, dx, dy);
+                        if (count >= 3) return true;
+                    }
                 }
+
                 return false;
             }
 
@@ -101,16 +100,46 @@ namespace GameSolver { namespace Connect4 {
                 return moves;
             }
 
-            /*
-             * Default constructor, builds an empty position.
-             */
-
         private:
-            int board[WIDTH][HEIGHT]; // 0 if the cell is empty, 1 for the first player, and 2 for the second player.
-            int columnHeight[WIDTH];  // Number of stones per column
-            unsigned int moves;       // Number of moves played since the beginning of the game.
+            int board[WIDTH][HEIGHT]{};  // 0 if the cell is empty, 1 for the first player, and 2 for the second player.
+            int columnHeight[WIDTH]{};   // Number of stones per column
+            unsigned int moves{0};      // Number of moves played since the beginning of the game.
+
+            /**
+             * Checks if a move to the given column is valid.
+             * @param col: 0-based index of the column to check
+             * @return true if the move is valid, false otherwise.
+             */
+            bool isValidMove(int col) const
+            {
+                return col >= 0 && col < WIDTH && canPlay(col) && !winningMove(col);
+            }
+
+            /**
+             * Counts the number of stones of the current player in a given direction from a specific position.
+             * @param startCol: The starting column
+             * @param startRow: The starting row
+             * @param dx: The change in column direction (-1, 0, or 1)
+             * @param dy: The change in row direction (-1, 0, or 1)
+             * @return The count of stones in the specified direction.
+             */
+            int countStonesInDirection(int startCol, int startRow, int dx, int dy) const
+            {
+                int currentPlayer = board[startCol][startRow];
+
+                for (int i = 1; i <= 3; ++i) {
+                    int col = startCol + i * dx;
+                    int row = startRow + i * dy;
+
+                    if (col < 0 || col >= WIDTH || row < 0 || row >= HEIGHT || board[col][row] != currentPlayer)
+                        return i - 1;  // Return the count directly without using a variable.
+                }
+
+                return 3;
+            }
         };
 
-    }} // end namespaces
+    }  // namespace Connect4
+}  // namespace GameSolver
 
 #endif
