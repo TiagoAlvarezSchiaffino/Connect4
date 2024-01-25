@@ -15,14 +15,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # You can define multiple libraries, and CMake builds them for you.
 # Gradle automatically packages shared libraries with your APK.
 
-add_library( # Sets the name of the library.
-             connect4
+set(SRC_FILES
+        algorithm.cpp
+        board.hpp
+        hash_table.hpp
+        )
 
-             # Sets the library as a shared library.
-             SHARED
-
-             # Provides a relative path to your source file(s).
-        algorithm.cpp)
+add_library(connect4 SHARED ${SRC_FILES})
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
@@ -47,3 +46,22 @@ target_link_libraries( # Specifies the target library.
                        # Links the target library to the log library
                        # included in the NDK.
                        ${log-lib} )
+
+target_include_directories(connect4 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Testing configuration
+option(BUILD_TESTS "Build tests" ON)
+
+IF(BUILD_TESTS)
+    message("Testing enabled")
+    set(TEST_SRC_FILES
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp/test.cpp
+            )
+    add_subdirectory(../../../gtest)
+    enable_testing()
+    include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
+    add_executable(runUnitTests ${TEST_SRC_FILES})
+    target_link_libraries(runUnitTests gtest gtest_main)
+    add_test(UnitTests runUnitTests)
+    target_compile_options(connect4 PRIVATE -g)
+ENDIF()
