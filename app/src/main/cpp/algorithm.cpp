@@ -1,4 +1,5 @@
 #include "board.hpp"
+#include "hash_table.hpp"
 #include <chrono>
 #include <iostream>
 #include <limits>
@@ -12,7 +13,7 @@ namespace GameSolver {
             std::chrono::steady_clock::duration timeLimit;
             int depthLimit;
 
-            int negamax(const Position &currentPosition, int depth, int alpha, int beta, std::chrono::steady_clock::time_point startTime);
+            int negamax(const Position &currentPosition, int depth, int alpha, int beta, std::chrono::steady_clock::time_point startTime, TranspositionTable &transTable);
 
         public:
             explicit Connect4Solver(std::chrono::steady_clock::duration timeLimit = std::chrono::steady_clock::duration::max(), int depthLimit = std::numeric_limits<int>::max())
@@ -34,7 +35,7 @@ namespace GameSolver {
 
 using namespace GameSolver::Connect4;
 
-int Connect4Solver::negamax(const Position &currentPosition, int depth, int alpha, int beta, std::chrono::steady_clock::time_point startTime) {
+int Connect4Solver::negamax(const Position &currentPosition, int depth, int alpha, int beta, std::chrono::steady_clock::time_point startTime, TranspositionTable &transTable) {
     exploredNodeCount++;
 
     if (depth == 0 || currentPosition.nbMoves() >= Position::WIDTH * Position::HEIGHT) {
@@ -52,9 +53,10 @@ int Connect4Solver::negamax(const Position &currentPosition, int depth, int alph
         int x = columnOrder[i];
         if (currentPosition.canPlay(x)) {
             Position nextPosition(currentPosition);
-            nextPosition.play(x);  // Corrected method name
+            nextPosition.play(x);
 
-            int score = -negamax(nextPosition, depth - 1, -beta, -alpha, startTime);
+            // Use the TranspositionTable in the recursive calls
+            int score = -negamax(nextPosition, depth - 1, -beta, -alpha, startTime, transTable);
 
             if (score >= beta) {
                 return score; // Beta cutoff
@@ -64,6 +66,9 @@ int Connect4Solver::negamax(const Position &currentPosition, int depth, int alph
                 alpha = score; // Update alpha
             }
         }
+
+        // Store the score in the TranspositionTable inside the loop
+        transTable.put(currentPosition.key(), static_cast<uint8_t>(alpha), false);
     }
 
     return alpha;
@@ -72,7 +77,9 @@ int Connect4Solver::negamax(const Position &currentPosition, int depth, int alph
 int Connect4Solver::solve(const Position &initialPosition) {
     exploredNodeCount = 0;
     auto startTime = std::chrono::steady_clock::now();
-    int score = negamax(initialPosition, depthLimit, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), startTime);
+    TranspositionTable transTable;  // Create a TranspositionTable instance
+    transTable.reset();
+    int score = negamax(initialPosition, depthLimit, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), startTime, transTable);
     auto endTime = std::chrono::steady_clock::now();
     std::cout << "Nodes explored: " << exploredNodeCount << std::endl;
     return score;
