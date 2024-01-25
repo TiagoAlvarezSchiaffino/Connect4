@@ -30,7 +30,19 @@ private:
      * @return The computed index.
      */
     size_t index(uint64_t key) const {
-        return key % TABLE_SIZE; // Simple modulo operation to determine the index
+        // Use double hashing for collision resolution
+        size_t hash1 = key % TABLE_SIZE;
+        size_t hash2 = 1 + (key % (TABLE_SIZE - 1));  // Ensure hash2 is never 0
+
+        size_t index = hash1;
+
+        // Handle collisions using linear probing
+        while (T[index].key != 0 && T[index].key != key) {
+            // Linear probing with double hashing
+            index = (index + hash2) % TABLE_SIZE;
+        }
+
+        return index;
     }
 
 public:
