@@ -1,5 +1,5 @@
-#ifndef POSITION_HPP
-#define POSITION_HPP
+#ifndef BOARD_HPP
+#define BOARD_HPP
 
 #include <string>
 #include <cstdint>
@@ -64,9 +64,9 @@ namespace GameSolver { namespace Connect4 {
         public:
             static const int WIDTH = 7;  // width of the board
             static const int HEIGHT = 6; // height of the board
-            static const int MIN_SCORE = -(WIDTH*HEIGHT)/2 + 3;
-            static const int MAX_SCORE = (WIDTH*HEIGHT+1)/2 - 3;
-            
+            static const int MIN_SCORE = -(WIDTH*HEIGHT)/2 + 3;  // Minimum possible score
+            static const int MAX_SCORE = (WIDTH*HEIGHT+1)/2 - 3;  // Maximum possible score
+
             static_assert(WIDTH < 10, "Board's width must be less than 10");
             static_assert(WIDTH * (HEIGHT + 1) <= 64, "Board does not fit in 64bits bitboard");
 
@@ -149,8 +149,8 @@ namespace GameSolver { namespace Connect4 {
             Position() : currentPosition{0}, mask{0}, moves{0} {}
 
         private:
-            uint64_t currentPosition;
-            uint64_t mask;
+            uint64_t currentPosition;  // Bitboard for the current player's stones
+            uint64_t mask;  // Bitboard for all stones (both players)
             unsigned int moves; // number of moves played since the beginning of the game.
 
             /**

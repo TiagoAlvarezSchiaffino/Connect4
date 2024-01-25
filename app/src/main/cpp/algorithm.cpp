@@ -7,25 +7,51 @@
 namespace GameSolver {
     namespace Connect4 {
 
+        /**
+        * Connect4Solver class is responsible for solving the Connect 4 game using the Negamax algorithm.
+        */
         class Connect4Solver {
         private:
-            unsigned long long exploredNodeCount = 0;
-            std::chrono::steady_clock::duration timeLimit;
-            int depthLimit;
+            unsigned long long exploredNodeCount = 0;  // Counter for the number of nodes explored
+            std::chrono::steady_clock::duration timeLimit;  // Time limit for the solver
+            int depthLimit;  // Depth limit for the solver
 
-            int negamax(const Position &currentPosition, int depth, int alpha, int beta, std::chrono::steady_clock::time_point startTime, TranspositionTable &transTable);
+            /**
+            * Implementation of the Negamax algorithm with alpha-beta pruning.
+            */
+            int negamax(const Position &currentPosition, int depth, int alpha, int beta,
+                        std::chrono::steady_clock::time_point startTime, TranspositionTable &transTable);
 
         public:
-            explicit Connect4Solver(std::chrono::steady_clock::duration timeLimit = std::chrono::steady_clock::duration::max(), int depthLimit = std::numeric_limits<int>::max())
+            /**
+            * Constructor for Connect4Solver.
+            * @param timeLimit The time limit for the solver.
+            * @param depthLimit The depth limit for the solver.
+            */
+            explicit Connect4Solver(std::chrono::steady_clock::duration timeLimit = std::chrono::steady_clock::duration::max(),
+                                    int depthLimit = std::numeric_limits<int>::max())
                     : timeLimit(timeLimit), depthLimit(depthLimit) {}
 
+            /**
+             * Solves the Connect 4 game for the given initial position.
+             * @param initialPosition The initial position of the game.
+             * @return The score of the best move.
+             */
             int solve(const Position &initialPosition);
 
+            /**
+             * Gets the count of explored nodes during the solving process.
+             * @return The count of explored nodes.
+             */
             unsigned long long getExploredNodeCount() const {
                 return exploredNodeCount;
             }
         };
 
+        /**
+        * Helper function to get the current time using std::chrono.
+        * @return The current time point.
+        */
         std::chrono::steady_clock::time_point getCurrentTime() {
             return std::chrono::steady_clock::now();
         }
