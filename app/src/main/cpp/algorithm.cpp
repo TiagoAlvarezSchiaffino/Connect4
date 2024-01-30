@@ -64,6 +64,12 @@ using namespace GameSolver::Connect4;
 int Connect4Solver::negamax(const Position &currentPosition, int depth, int alpha, int beta, std::chrono::steady_clock::time_point startTime, TranspositionTable &transTable) {
     exploredNodeCount++;
 
+    // Use the TranspositionTable in the initial position
+    uint8_t ttEntry = transTable.get(currentPosition.key());
+    if (ttEntry != 0) {
+        return (currentPosition.nbMoves() - ttEntry);  // Return the stored score from the transposition table
+    }
+
     if (depth == 0 || currentPosition.nbMoves() >= Position::WIDTH * Position::HEIGHT) {
         return currentPosition.nbMoves(); // Use the number of moves as a score
     }
@@ -105,10 +111,28 @@ int Connect4Solver::solve(const Position &initialPosition) {
     auto startTime = std::chrono::steady_clock::now();
     TranspositionTable transTable;  // Create a TranspositionTable instance
     transTable.reset();
-    int score = negamax(initialPosition, depthLimit, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), startTime, transTable);
-    auto endTime = std::chrono::steady_clock::now();
+
+    int bestScore = 0;  // Initialize with a neutral value
+    int depth;
+
+    for (depth = 1; depth <= depthLimit; ++depth) {
+        int score = negamax(initialPosition, depth, std::numeric_limits<int>::min() + 1, std::numeric_limits<int>::max(), startTime, transTable);
+        auto endTime = std::chrono::steady_clock::now();
+
+        // Check if the time limit has been exceeded
+        if (endTime - startTime >= timeLimit) {
+            std::cout << "Time's up! ";
+            break;
+        }
+
+        // Update the best score
+        bestScore = score;
+        std::cout << "Depth " << depth << " completed. Nodes explored: " << exploredNodeCount << std::endl;
+    }
+
     std::cout << "Nodes explored: " << exploredNodeCount << std::endl;
-    return score;
+    std::cout << "Completed search up to depth " << (depth - 1) << ". ";
+    return bestScore;
 }
 
 int main() {
