@@ -22,6 +22,9 @@ namespace GameSolver {
             int negamax(const Position &currentPosition, int depth, int alpha, int beta,
                         std::chrono::steady_clock::time_point startTime, TranspositionTable &transTable);
 
+            // Function to avoid losing moves
+            bool isLosingMove(const Position &position, int move);
+
         public:
             /**
             * Constructor for Connect4Solver.
@@ -48,12 +51,24 @@ namespace GameSolver {
             }
         };
 
-        /**
-        * Helper function to get the current time using std::chrono.
-        * @return The current time point.
-        */
-        std::chrono::steady_clock::time_point getCurrentTime() {
-            return std::chrono::steady_clock::now();
+        bool Connect4Solver::isLosingMove(const Position &position, int move) {
+            Position nextPosition(position);
+            nextPosition.play(move);
+
+            // Check if the move leads to a losing position
+            for (int col = 0; col < Position::WIDTH; ++col) {
+                if (nextPosition.canPlay(col)) {
+                    Position opponentPosition(nextPosition);
+                    opponentPosition.play(col);
+
+                    // If the opponent can win on their next move, this is a losing move
+                    if (opponentPosition.isWinningMove(col)) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
     } // namespace Connect4
@@ -83,7 +98,7 @@ int Connect4Solver::negamax(const Position &currentPosition, int depth, int alph
 
     for (int i = 0; i < Position::WIDTH; i++) {
         int x = columnOrder[i];
-        if (currentPosition.canPlay(x)) {
+        if (currentPosition.canPlay(x) && !isLosingMove(currentPosition, x)) {
             Position nextPosition(currentPosition);
             nextPosition.play(x);
 
